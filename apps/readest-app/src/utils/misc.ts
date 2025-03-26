@@ -30,11 +30,25 @@ export const makeSafeFilename = (filename: string, replacement = '_') => {
   return safeName.trim();
 };
 
-export const getUserLang = () => navigator?.language.split('-')[0] || 'en';
+export const getUserLang = () => {
+  // Check if we're in a browser environment
+  if (typeof navigator === 'undefined') {
+    return 'en'; // Default to English when running on server
+  }
+  return navigator.language.split('-')[0] || 'en';
+};
 
-export const isCJKEnv = () => ['zh', 'ja', 'ko'].includes(getUserLang());
+export const isCJKEnv = () => {
+  // Use getUserLang which already has the SSR check
+  return ['zh', 'ja', 'ko'].includes(getUserLang());
+};
 
 export const getUserLocale = (lang: string): string | undefined => {
+  // Check if we're in a browser environment
+  if (typeof navigator === 'undefined') {
+    return undefined;
+  }
+  
   const languages =
     navigator.languages && navigator.languages.length > 0
       ? navigator.languages
@@ -48,6 +62,11 @@ export const getUserLocale = (lang: string): string | undefined => {
 // when possible please use appService.isIOSApp || getOSPlatform() === 'ios'
 // to check if the app is running on iOS
 export const getOSPlatform = () => {
+  // Check if we're in a browser environment
+  if (typeof navigator === 'undefined') {
+    return ''; // Return empty when running on server
+  }
+  
   const userAgent = navigator.userAgent.toLowerCase();
 
   if (/iphone|ipad|ipod/.test(userAgent)) return 'ios';

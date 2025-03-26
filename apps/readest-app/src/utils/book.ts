@@ -37,20 +37,22 @@ export interface Contributor {
   name: LanguageMap;
 }
 
-const userLang = getUserLang();
+const getUserLanguage = () => getUserLang();
 
 const formatLanguageMap = (x: string | LanguageMap): string => {
   if (!x) return '';
   if (typeof x === 'string') return x;
   const keys = Object.keys(x);
-  return x[userLang] || x[keys[0]!]!;
+  const currentLang = getUserLanguage();
+  return x[currentLang] || x[keys[0]!]!;
 };
 
-export const listFormater = (narrow = false, lang = userLang) => {
+export const listFormater = (narrow = false, lang?: string) => {
+  const currentLang = lang || getUserLanguage();
   if (narrow) {
     return new Intl.ListFormat('en', { style: 'narrow', type: 'unit' });
   } else {
-    return new Intl.ListFormat(lang, { style: 'long', type: 'conjunction' });
+    return new Intl.ListFormat(currentLang, { style: 'long', type: 'conjunction' });
   }
 };
 
@@ -97,7 +99,8 @@ export const primaryLanguage = (lang: string | string[] | undefined) => {
 export const formatDate = (date: string | number | Date | undefined) => {
   if (!date) return;
   try {
-    return new Date(date).toLocaleDateString(userLang, {
+    const currentLang = getUserLanguage();
+    return new Date(date).toLocaleDateString(currentLang, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
