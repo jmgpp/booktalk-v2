@@ -29,7 +29,47 @@ declare global {
   }
 }
 
-const OS_TYPE = osType();
+// Determine if we're in a Tauri environment
+const isTauriApp = () => {
+  return process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'tauri';
+};
+
+// Safely determine OS type with fallback
+const getOSType = (): string => {
+  if (!isTauriApp()) {
+    // Web environment - detect OS from user agent
+    if (typeof window !== 'undefined' && window.navigator) {
+      const userAgent = window.navigator.userAgent;
+      if (userAgent.indexOf('Win') !== -1) return 'windows';
+      if (userAgent.indexOf('Mac') !== -1) return 'macos';
+      if (userAgent.indexOf('Linux') !== -1) return 'linux';
+      if (userAgent.indexOf('Android') !== -1) return 'android';
+      if (userAgent.indexOf('iPhone') !== -1 || userAgent.indexOf('iPad') !== -1) return 'ios';
+    }
+    return 'unknown';
+  }
+
+  // Tauri environment - use the plugin but with a safety fallback
+  try {
+    return osType();
+  } catch (error) {
+    console.error('Error determining OS type using Tauri plugin:', error);
+    return 'unknown';
+  }
+};
+
+// Use a getter function to ensure OS_TYPE is only evaluated when needed
+// and not during module initialization
+const getOS_TYPE = (() => {
+  let cachedOSType: string | null = null;
+  
+  return () => {
+    if (cachedOSType === null) {
+      cachedOSType = getOSType();
+    }
+    return cachedOSType;
+  };
+})();
 
 const resolvePath = (fp: string, base: BaseDir): { baseDir: number; base: BaseDir; fp: string } => {
   switch (base) {
@@ -123,25 +163,36 @@ export const nativeFileSystem: FileSystem = {
 export class NativeAppService extends BaseAppService {
   fs = nativeFileSystem;
   appPlatform = 'tauri' as AppPlatform;
-  isAppDataSandbox = ['android', 'ios'].includes(OS_TYPE);
-  isMobile = ['android', 'ios'].includes(OS_TYPE);
-  isAndroidApp = OS_TYPE === 'android';
-  isIOSApp = OS_TYPE === 'ios';
-  hasTrafficLight = OS_TYPE === 'macos';
-  hasWindow = !(OS_TYPE === 'ios' || OS_TYPE === 'android');
-  hasWindowBar = !(OS_TYPE === 'ios' || OS_TYPE === 'android');
-  hasContextMenu = !(OS_TYPE === 'ios' || OS_TYPE === 'android');
-  hasRoundedWindow = !(OS_TYPE === 'ios' || OS_TYPE === 'android') && !!window.IS_ROUNDED;
-  hasSafeAreaInset = OS_TYPE === 'ios' || OS_TYPE === 'android';
-  hasHaptics = OS_TYPE === 'ios' || OS_TYPE === 'android';
-  hasSysFontsList = !(OS_TYPE === 'ios' || OS_TYPE === 'android');
+  
+  // Use the getter function to ensure OS_TYPE is only evaluated when needed
+  get isAppDataSandbox() { return ['android', 'ios'].includes(getOS_TYPE()); }
+  get isMobile() { return ['android', 'ios'].includes(getOS_TYPE()); }
+  get isAndroidApp() { return getOS_TYPE() === 'android'; }
+  get isIOSApp() { return getOS_TYPE() === 'ios'; }
+  get hasTrafficLight() { return getOS_TYPE() === 'macos'; }
+  get hasWindow() { return !(getOS_TYPE() === 'ios' || getOS_TYPE() === 'android'); }
+  get hasWindowBar() { return !(getOS_TYPE() === 'ios' || getOS_TYPE() === 'android'); }
+  get hasContextMenu() { return !(getOS_TYPE() === 'ios' || getOS_TYPE() === 'android'); }
+  get hasRoundedWindow() { return !(getOS_TYPE() === 'ios' || getOS_TYPE() === 'android') && !!window.IS_ROUNDED; }
+  get hasSafeAreaInset() { return getOS_TYPE() === 'ios' || getOS_TYPE() === 'android'; }
+  get hasHaptics() { return getOS_TYPE() === 'ios' || getOS_TYPE() === 'android'; }
+  get hasSysFontsList() { return !(getOS_TYPE() === 'ios' || getOS_TYPE() === 'android'); }
 
   override resolvePath(fp: string, base: BaseDir): { baseDir: number; base: BaseDir; fp: string } {
     return resolvePath(fp, base);
   }
 
   async getInitBooksDir(): Promise<string> {
-    return join(await appDataDir(), LOCAL_BOOKS_SUBDIR);
+    try {
+      if (!isTauriApp()) {
+        // In web environment, just return the local books directory
+        return LOCAL_BOOKS_SUBDIR;
+      }
+      return join(await appDataDir(), LOCAL_BOOKS_SUBDIR);
+    } catch (error) {
+      console.error("Error getting books directory, falling back to local path:", error);
+      return LOCAL_BOOKS_SUBDIR;
+    }
   }
 
   async selectFiles(name: string, extensions: string[]): Promise<string[]> {

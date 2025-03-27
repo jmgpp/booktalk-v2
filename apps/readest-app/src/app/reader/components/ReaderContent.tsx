@@ -49,24 +49,67 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
     if (isInitiating.current) return;
     isInitiating.current = true;
 
-    const bookIds = ids || searchParams?.get('ids') || '';
-    const initialIds = bookIds.split(BOOK_IDS_SEPARATOR).filter(Boolean);
-    const initialBookKeys = initialIds.map((id) => `${id}-${uniqueId()}`);
-    setBookKeys(initialBookKeys);
-    const uniqueIds = new Set<string>();
-    console.log('Initialize books', initialBookKeys);
-    initialBookKeys.forEach((key, index) => {
-      const id = key.split('-')[0]!;
-      const isPrimary = !uniqueIds.has(id);
-      uniqueIds.add(id);
-      if (!getViewState(key)) {
-        initViewState(envConfig, id, key, isPrimary).catch((error) => {
-          console.log('Error initializing book', key, error);
-        });
-        if (index === 0) setSideBarBookKey(key);
+    const initLibrary = async () => {
+      try {
+        const bookIds = ids || searchParams?.get('ids') || '';
+        const initialIds = bookIds.split(BOOK_IDS_SEPARATOR).filter(Boolean);
+        const initialBookKeys = initialIds.map((id) => `${id}-${uniqueId()}`);
+        setBookKeys(initialBookKeys);
+        const uniqueIds = new Set<string>();
+        console.log('Initialize books', initialBookKeys);
+        
+        // Preload covers first
+        for (let i = 0; i < initialBookKeys.length; i++) {
+          const key = initialBookKeys[i];
+          const id = key.split('-')[0]!;
+          
+          try {
+            // Pre-extract and cache cover images
+            const viewState = await initViewState(envConfig, id, key, true, false);
+            if (viewState?.bookDoc?.metadata) {
+              const metadata = viewState.bookDoc.metadata as any;
+              
+              // Try to extract the cover if available
+              if (metadata.cover && typeof viewState.bookDoc.getCover === 'function') {
+                try {
+                  const cover = await viewState.bookDoc.getCover();
+                  if (cover) {
+                    metadata.coverImageBlob = cover;
+                    console.log('Successfully preloaded cover for book', key);
+                  }
+                } catch (coverError) {
+                  console.error('Error preloading cover for book', key, coverError);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error preloading book data', key, error);
+          }
+        }
+        
+        // Now initialize the books with the preloaded covers
+        for (let i = 0; i < initialBookKeys.length; i++) {
+          const key = initialBookKeys[i];
+          const id = key.split('-')[0]!;
+          const isPrimary = !uniqueIds.has(id);
+          uniqueIds.add(id);
+          
+          try {
+            if (!getViewState(key)) {
+              await initViewState(envConfig, id, key, isPrimary, true);
+              if (i === 0) setSideBarBookKey(key);
+            }
+          } catch (error) {
+            console.log('Error initializing book', key, error);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing library:', error);
       }
-    });
+    };
 
+    initLibrary();
+    
     const handleShowBookDetails = (event: CustomEvent) => {
       const book = event.detail as Book;
       setShowDetailsBook(book);

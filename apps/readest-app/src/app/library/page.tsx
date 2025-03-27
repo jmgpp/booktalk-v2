@@ -1,18 +1,20 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import Spinner from '@/components/Spinner';
-
-// Dynamically import the actual library page with no SSR
-const LibraryPageContent = dynamic(() => import('./components/LibraryContent'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-screen w-full items-center justify-center">
-      <Spinner />
-    </div>
-  ),
-});
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LibraryPage() {
-  return <LibraryPageContent />;
+  const router = useRouter();
+  
+  useEffect(() => {
+    router.push('/');
+  }, [router]);
+  
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="text-center">
+        <p>Redirecting to homepage...</p>
+      </div>
+    </div>
+  );
 }

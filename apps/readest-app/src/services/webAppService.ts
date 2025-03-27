@@ -204,8 +204,40 @@ export class WebAppService extends BaseAppService {
     throw new Error('selectDirectory is not supported in browser');
   }
 
-  async selectFiles(): Promise<string[]> {
-    throw new Error('selectFiles is not supported in browser');
+  async selectFiles(name: string, extensions: string[]): Promise<string[]> {
+    // Create a file input element
+    return new Promise<string[]>((resolve) => {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.multiple = true;
+      
+      // Set accepted file extensions
+      if (extensions && extensions.length > 0) {
+        fileInput.accept = extensions.map(ext => `.${ext}`).join(',');
+      }
+      
+      // Handle file selection
+      fileInput.onchange = async () => {
+        if (!fileInput.files || fileInput.files.length === 0) {
+          resolve([]);
+          return;
+        }
+        
+        // Convert File objects to base64 URLs
+        const fileUrls: string[] = [];
+        for (let i = 0; i < fileInput.files.length; i++) {
+          const file = fileInput.files[i];
+          if (file) {
+            fileUrls.push(URL.createObjectURL(file));
+          }
+        }
+        
+        resolve(fileUrls);
+      };
+      
+      // Trigger the file picker
+      fileInput.click();
+    });
   }
 
   async showMessage(msg: string, kind: ToastType = 'info'): Promise<void> {

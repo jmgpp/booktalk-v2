@@ -30,9 +30,15 @@ export interface EnvConfigType {
 let nativeAppService: AppService | null = null;
 const getNativeAppService = async () => {
   if (!nativeAppService) {
-    const { NativeAppService } = await import('@/services/nativeAppService');
-    nativeAppService = new NativeAppService();
-    await nativeAppService.loadSettings();
+    try {
+      const { NativeAppService } = await import('@/services/nativeAppService');
+      nativeAppService = new NativeAppService();
+      await nativeAppService.loadSettings();
+    } catch (error) {
+      console.error('Failed to initialize native app service, falling back to web:', error);
+      // If native service fails, fall back to web service
+      return getWebAppService();
+    }
   }
   return nativeAppService;
 };
@@ -50,7 +56,12 @@ const getWebAppService = async () => {
 const environmentConfig: EnvConfigType = {
   getAppService: async () => {
     if (isTauriAppPlatform()) {
-      return getNativeAppService();
+      try {
+        return await getNativeAppService();
+      } catch (error) {
+        console.error('Error initializing Tauri app service, falling back to web:', error);
+        return getWebAppService();
+      }
     } else {
       return getWebAppService();
     }
